@@ -11,6 +11,7 @@ import (
 	"usercenter/user"
 
 	//"github.com/gorilla/mux"
+	"github.com/juju/ratelimit"
 	"github.com/zheng-ji/goSnowFlake"
 )
 
@@ -36,9 +37,13 @@ func NewUserServer() *UserServer {
 	}
 
 	return &UserServer{
-		userDataCenter:     NewUserDataCenter(),
-		userRelationCenter: NewRelationShipCenter(),
-		idGenerater:        idGenerater,
+		userDataCenter:          NewUserDataCenter(),
+		userRelationCenter:      NewRelationShipCenter(),
+		idGenerater:             idGenerater,
+		userReadBucket:          ratelimit.NewBucketWithRate(50000, 100000),
+		userWriteBucket:         ratelimit.NewBucketWithRate(30000, 60000),
+		userRelationAddBucket:   ratelimit.NewBucketWithRate(20000, 40000),
+		userRelationsReadBucket: ratelimit.NewBucketWithRate(30000, 60000),
 	}
 }
 
@@ -46,6 +51,12 @@ type UserServer struct {
 	userDataCenter     *UserDataCenter
 	userRelationCenter *RelationShipCenter
 	idGenerater        *goSnowFlake.IdWorker
+
+	userReadBucket  *ratelimit.Bucket
+	userWriteBucket *ratelimit.Bucket
+
+	userRelationAddBucket   *ratelimit.Bucket
+	userRelationsReadBucket *ratelimit.Bucket
 }
 
 func (self *UserServer) ShutdownRacefully() bool {
@@ -73,6 +84,11 @@ func (self *UserServer) ShutdownRacefully() bool {
 }
 
 func (self *UserServer) GetRelationshipHandler(w http.ResponseWriter, r *http.Request) {
+	hasToken := self.userRelationsReadBucket.WaitMaxDuration(1, 10*time.Millisecond)
+	if !hasToken {
+		self.writeErrorMessage("no token", w)
+		return
+	}
 	if r.Method == "GET" {
 		userId := StringToInt64(GetUrlPathArg(r.URL.Path, 2))
 		if !user.CheckUsrIdValid(userId) {
@@ -92,6 +108,11 @@ type RelationShipPutData struct {
 }
 
 func (self *UserServer) PutRelationshipHandler(w http.ResponseWriter, r *http.Request) {
+	hasToken := self.userRelationAddBucket.WaitMaxDuration(1, 10*time.Millisecond)
+	if !hasToken {
+		self.writeErrorMessage("no token", w)
+		return
+	}
 	if r.Method == "PUT" {
 		userId := StringToInt64(GetUrlPathArg(r.URL.Path, 2))
 		otherUserId := StringToInt64(GetUrlPathArg(r.URL.Path, 4))
@@ -147,6 +168,12 @@ type UserPostData struct {
 }
 
 func (self *UserServer) userAddHandler(w http.ResponseWriter, r *http.Request) {
+	hasToken := self.userWriteBucket.WaitMaxDuration(1, 10*time.Millisecond)
+	if !hasToken {
+		self.writeErrorMessage("no token", w)
+		return
+	}
+
 	data, err := ReadHttpRequestBody(r)
 	if err != nil {
 		self.writeErrorMessage("read post body get error: "+err.Error(), w)
@@ -191,6 +218,12 @@ func (self *UserServer) userAddHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (self *UserServer) showAllUsersHandler(w http.ResponseWriter, r *http.Request) {
+	hasToken := self.userReadBucket.WaitMaxDuration(1, 10*time.Millisecond)
+	if !hasToken {
+		self.writeErrorMessage("no token", w)
+		return
+	}
+
 	resp, err := self.userDataCenter.UserList()
 	if err != nil {
 		self.writeErrorMessage("some err with user list: "+err.Error(), w)

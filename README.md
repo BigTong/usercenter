@@ -11,7 +11,7 @@
 
 ## todo list
 - [x] racefully shutdown;
-- [] rate limit;
+- [x] rate limit;
 - [x] test basic api;
 - [x] design cache;
 - [ ] add basic unitest(done part);

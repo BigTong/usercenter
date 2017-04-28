@@ -10,14 +10,14 @@
 ## features
 
 ## todo list
-- [ ] racefully shutdown;
-- [ ] rate limit;
-- [ ] test basic api;
-- [ ] design cache;
-- [ ] add basic unitest;
+- [x] racefully shutdown;
+- [] rate limit;
+- [x] test basic api;
+- [x] design cache;
+- [ ] add basic unitest(done part);
 - [ ] add bentch mark;
 - [ ] cache data on redis instead of in local mem;
 - [ ] Optimize and refact database sql;
 - [ ] refact code;
 
-## benchmark result;
+## benchmark result

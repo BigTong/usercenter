@@ -31,8 +31,8 @@ func (u *UserRelations) LikeMe(otherUserId int64) bool {
 	u.rwLock.RLock()
 	defer u.rwLock.RUnlock()
 	for _, r := range u.relationShips {
-		if r.OtherSide == otherUserId &&
-			r.State == user.RELATION_STATE_LICKED {
+		if r.Otherside == otherUserId &&
+			r.State == user.RELATION_STATE_LIKED {
 			return true
 		}
 	}
@@ -44,7 +44,7 @@ func (u *UserRelations) UpdateUserRelation(
 	u.rwLock.Lock()
 	defer u.rwLock.Unlock()
 	for _, r := range u.relationShips {
-		if r.OtherSide == userRelation.OtherSide {
+		if r.Otherside == userRelation.Otherside {
 			r.State = userRelation.State
 			return true
 		}
@@ -56,7 +56,7 @@ func (u *UserRelations) UpdateUserRelation(
 
 func NewRelationsCache() *RelationsCache {
 	ret := &RelationsCache{
-		relationBuckets: make([]*cache.Cache, DEFAULT_BUCKET_NUM),
+		relationBuckets: []*cache.Cache{},
 	}
 	for i := 0; i < DEFAULT_BUCKET_NUM; i++ {
 		ret.relationBuckets = append(ret.relationBuckets,

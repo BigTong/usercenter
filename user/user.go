@@ -5,7 +5,7 @@ import (
 )
 
 const (
-	RELATION_STATE_LICKED   = "liked"
+	RELATION_STATE_LIKED    = "liked"
 	RELATION_STATE_DISLIKED = "disliked"
 	RELATION_STATE_MATCHED  = "matched"
 )
@@ -25,7 +25,7 @@ type User struct {
 type UserRelationShip struct {
 	Id        int64  `json:"id"`
 	State     string `json:"state"`
-	OtherSide int64  `json:"other_side"`
+	Otherside int64  `json:"other_side"`
 }
 
 func UserRelationShipToString(relation *UserRelationShip) string {
@@ -37,13 +37,13 @@ func NewUserRelation(userId, otherUserId int64, state string) *UserRelationShip 
 	return &UserRelationShip{
 		Id:        userId,
 		State:     state,
-		OtherSide: otherUserId,
+		Otherside: otherUserId,
 	}
 }
 
 func CheckRelationStateValid(state string) bool {
 	if state == RELATION_STATE_DISLIKED ||
-		state == RELATION_STATE_LICKED {
+		state == RELATION_STATE_LIKED {
 		return true
 	}
 

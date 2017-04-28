@@ -1,3 +1,5 @@
 {
-	
+	"user":     "postgres",
+	"password": "zex",
+	"database": "userdb"
 }

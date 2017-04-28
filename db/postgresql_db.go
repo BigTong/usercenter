@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	"usercenter/user"
@@ -133,8 +134,8 @@ func (self *PostgresQlDb) GetRelationWithOtherUserId(userId,
 	otherUserId int64) *user.UserRelationShip {
 	relation := &user.UserRelationShip{}
 	_, err := self.db.QueryOne(relation,
-		`SELECT user_id, state, otherside FROM relations 
-		WHERE user_id=? AND otherside=?`, userId, otherUserId)
+		`SELECT id, state, otherside FROM relations 
+		WHERE id=? AND otherside=?`, userId, otherUserId)
 	if err != nil {
 		return nil
 	}
@@ -144,19 +145,28 @@ func (self *PostgresQlDb) GetRelationWithOtherUserId(userId,
 func (self *PostgresQlDb) UpdateUserRelation(
 	relation *user.UserRelationShip) (*user.UserRelationShip, error) {
 
-	otherSideRelation := self.GetRelationWithOtherUserId(relation.OtherSide, relation.Id)
-	if relation.State == user.RELATION_STATE_LICKED &&
+	otherSideRelation := self.GetRelationWithOtherUserId(relation.Otherside, relation.Id)
+
+	if otherSideRelation != nil {
+		log.Printf("otherRelation:%d  %s %d",
+			otherSideRelation.Id, otherSideRelation.State, otherSideRelation.Otherside)
+	} else {
+		log.Printf("get nil other relation:%s", relation.Otherside)
+	}
+
+	if relation.State == user.RELATION_STATE_LIKED &&
 		otherSideRelation != nil &&
-		otherSideRelation.State == user.RELATION_STATE_LICKED {
+		strings.EqualFold(otherSideRelation.State, user.RELATION_STATE_LIKED) {
+		log.Printf("matched:%d", relation.Id)
 		relation.State = user.RELATION_STATE_MATCHED
 		_, err := self.db.ExecOne(
-			`UPDATE relations SET state=? WHERE user_id=? AND otherside=?`,
-			user.RELATION_STATE_MATCHED, relation.OtherSide, relation.Id)
+			`UPDATE relations SET state=? WHERE id=? AND otherside=?`,
+			user.RELATION_STATE_MATCHED, relation.Otherside, relation.Id)
 		if err != nil {
 			return nil, err
 		}
 		_, err = self.db.ExecOne(`INSERT INTO relations
-			(user_id, state, otherside)
+			(id, state, otherside)
 			 VALUES (?id, ?state, ?otherside)`, relation)
 		if err != nil {
 			return nil, err
@@ -165,8 +175,8 @@ func (self *PostgresQlDb) UpdateUserRelation(
 	}
 
 	_, err := self.db.ExecOne(`INSERT INTO relations
-			(user_id, state, otherside)
-			VALUES(?user_id, ?state, ?otherside)`, relation)
+			(id, state, otherside)
+			VALUES(?id, ?state, ?otherside)`, relation)
 	if err != nil {
 		return nil, err
 	}
@@ -177,7 +187,7 @@ func (self *PostgresQlDb) GetUserRelation(
 	userId int64) ([]*user.UserRelationShip, error) {
 	relations := []*user.UserRelationShip{}
 	_, err := self.db.Query(&relations,
-		`SELECT user_id, state, otherside FROM relations where user_id=?`,
+		`SELECT id, state, otherside FROM relations where id=?`,
 		userId)
 	if err != nil {
 		return nil, err

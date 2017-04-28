@@ -3,6 +3,7 @@ package usercenter
 import (
 	"encoding/json"
 	"log"
+	"time"
 
 	"usercenter/db"
 	"usercenter/user"
@@ -13,7 +14,12 @@ const (
 )
 
 func NewRelationShipCenter() *RelationShipCenter {
-	ret := &RelationShipCenter{}
+	ret := &RelationShipCenter{
+		relationsToDb:         make(chan *user.UserRelationShip, DEFAULT_CHAN_LEN),
+		cache:                 NewRelationsCache(),
+		postgresDb:            db.NewPostgresQlDb(*postgresdbConfigFile),
+		needFlushRelationData: false,
+	}
 	go ret.writeUserRelationsToDb()
 	return ret
 }
@@ -52,7 +58,7 @@ func (self *RelationShipCenter) UpdateRelationShip(relation *user.UserRelationSh
 		return user.UserRelationShipToString(relation)
 	}
 
-	otherUserRelations, otherOk := self.cache.GetUserRelations(relation.OtherSide)
+	otherUserRelations, otherOk := self.cache.GetUserRelations(relation.Otherside)
 	if otherOk && otherUserRelations.LikeMe(relation.Id) {
 		self.relationsToDb <- relation
 		relation.State = user.RELATION_STATE_MATCHED
@@ -60,7 +66,7 @@ func (self *RelationShipCenter) UpdateRelationShip(relation *user.UserRelationSh
 			userRelations.UpdateUserRelation(relation)
 		}
 		ret := user.UserRelationShipToString(relation)
-		relation.Id, relation.OtherSide = relation.OtherSide, relation.Id
+		relation.Id, relation.Otherside = relation.Otherside, relation.Id
 		otherUserRelations.UpdateUserRelation(relation)
 		return ret
 	}
@@ -76,9 +82,21 @@ func (self *RelationShipCenter) UpdateRelationShip(relation *user.UserRelationSh
 	return user.UserRelationShipToString(newRelation)
 }
 
+func (self *RelationShipCenter) waitingForDataWriteFinished() bool {
+	self.needFlushRelationData = true
+	for {
+		if len(self.relationsToDb) == 0 {
+			self.postgresDb.Close()
+			return true
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	return true
+}
+
 func (self *RelationShipCenter) writeUserRelationsToDb() {
 	cnt := 0
-	relations := make([]*user.UserRelationShip, DEFAULT_BATCH_WRITE_NUM)
+	relations := []*user.UserRelationShip{}
 	for {
 		relation := <-self.relationsToDb
 		relations = append(relations, relation)

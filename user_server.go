@@ -49,6 +49,30 @@ type UserServer struct {
 	idGenerater        *goSnowFlake.IdWorker
 }
 
+func (self *UserServer) ShutdownRacefully() bool {
+	signal := make(chan int, 2)
+
+	go func() {
+		if self.userDataCenter.WaitingForDataWriteFinished() {
+			signal <- 1
+		}
+	}()
+
+	go func() {
+		if self.userRelationCenter.waitingForDataWriteFinished() {
+			signal <- 1
+		}
+	}()
+
+	for {
+		if len(signal) == 2 {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	return true
+}
+
 func (self *UserServer) GetRelationshipHandler(w http.ResponseWriter, r *http.Request) {
 	defer func() {
 		if r := recover(); r != nil {

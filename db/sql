@@ -12,9 +12,9 @@ CREATE TABLE users(
    type           varchar(8)  
 );
 
-CREATE TABLE relationships(
+CREATE TABLE relations(
 	_id            serial        NOT NULL,
-   user_id         bigint        NOT NULL,
-   state           char(16)       NOT NULL,
-   otherside       bigint        NOT NULL   
+   id              bigint        NOT NULL,
+   state           varchar(16)       NOT NULL,
+   otherside       bigint        NOT NULL
 );

@@ -45,4 +45,6 @@ func TestLoadUserList(t *testing.T) {
 
 }
 
-func TestGetUserRelation(t *testing.T)
+func TestGetUserRelation(t *testing.T) {
+
+}

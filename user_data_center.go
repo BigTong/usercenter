@@ -5,6 +5,7 @@ import (
 	"flag"
 	"log"
 	"sync"
+	"time"
 
 	"usercenter/db"
 	"usercenter/user"
@@ -90,9 +91,16 @@ func (self *UserDataCenter) UserList() ([]byte, error) {
 	return json.Marshal(self.userList)
 }
 
-func (self *UserDataCenter) WriteUserDataFinished() bool {
+func (self *UserDataCenter) WaitingForDataWriteFinished() bool {
 	self.needFlushUserData = true
-	return len(self.updateUserChan) == 0
+	for {
+		if len(self.updateUserChan) == 0 {
+			self.postgresDb.Close()
+			return true
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	return true
 }
 
 func (self *UserDataCenter) loadUserListFromDb() {
@@ -110,16 +118,17 @@ func (self *UserDataCenter) loadUserListFromDb() {
 
 func (self *UserDataCenter) WriteNewUserDataToDb() {
 	cnt := 0
-	users := make([]*user.User, DEFAULT_BATCH_WRITE_NUM)
+	users := []*user.User{}
 	for {
 		user := <-self.updateUserChan
 		users = append(users, user)
 		cnt++
 		if (self.needFlushUserData && len(self.updateUserChan) == 0) ||
 			cnt == DEFAULT_BATCH_WRITE_NUM {
+			log.Printf("get user:%v len:%d", *users[0], len(users))
 			err := self.postgresDb.AddUser(users)
 			if err != nil {
-				panic("write db get error:" + err.Error())
+				log.Panicln("write db get error:" + err.Error())
 			}
 			cnt = 0
 			users = users[:0]

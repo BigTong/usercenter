@@ -6,3 +6,18 @@
 ## designe
 
 ## deploy 
+
+## features
+
+## todo list
+- [ ] racefully shutdown;
+- [ ] rate limit;
+- [ ] test basic api;
+- [ ] design cache;
+- [ ] add basic unitest;
+- [ ] add bentch mark;
+- [ ] cache data on redis instead of in local mem;
+- [ ] Optimize and refact database sql;
+- [ ] refact code;
+
+## benchmark result;

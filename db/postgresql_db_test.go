@@ -28,6 +28,7 @@ func TestAddUser(t *testing.T) {
 	if err != nil {
 		t.Error(err.Error())
 	}
+	//ToDo do more check
 }
 
 func TestLoadUserList(t *testing.T) {
@@ -35,16 +36,18 @@ func TestLoadUserList(t *testing.T) {
 	if err != nil {
 		t.Error(err.Error())
 	}
-	t.Logf("len:%d", userList[0], len(userList))
-	if len(userList) > 0 {
-		t.Logf("first user: %s %d %s",
-			userList[0].Name,
-			userList[0].Createdtime,
-			userList[0].Gender)
-	}
-
+	//ToDo do more check
+	/*
+		t.Logf("len:%d", userList[0], len(userList))
+		if len(userList) > 0 {
+			t.Logf("first user: %s %d %s",
+				userList[0].Name,
+				userList[0].Createdtime,
+				userList[0].Gender)
+		}
+	*/
 }
 
 func TestGetUserRelation(t *testing.T) {
-
+	// ToDo
 }

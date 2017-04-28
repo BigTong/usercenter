@@ -3,10 +3,13 @@ package main
 import (
 	"flag"
 	"log"
+	"net/http"
+	_ "net/http/pprof"
+	"runtime"
 
 	"usercenter"
 
-	"github.com/valyala/fasthttp"
+	"github.com/gorilla/mux"
 )
 
 var (
@@ -14,16 +17,17 @@ var (
 )
 
 func main() {
+	runtime.GOMAXPROCS(4)
+
 	flag.Parse()
 
-	userServer := usercenter.NewUserServer()
-	requestHandler := func(ctx *fasthttp.RequestCtx) {
-		userServer.RequestHandler(ctx)
-	}
+	service := usercenter.NewUserServer()
 
-	if len(*addr) == 0 {
-		log.Fatalf("not valid http server addr for %s", *addr)
-	}
-
-	fasthttp.ListenAndServe(*addr, requestHandler)
+	router := mux.NewRouter()
+	router.HandleFunc("/users", service.UserRequestHandler)
+	router.HandleFunc("/users/{userId:[0-9]+}/relationships",
+		service.GetRelationshipHandler)
+	router.HandleFunc("/users/{userId:[0-9]+}/relationships/{otherUserId:[0-9]+}",
+		service.PutRelationshipHandler)
+	log.Fatal(http.ListenAndServe(*addr, router))
 }

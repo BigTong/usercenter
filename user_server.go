@@ -5,11 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net/http"
+	"runtime"
 	"time"
 
 	"usercenter/user"
 
-	"github.com/valyala/fasthttp"
+	//"github.com/gorilla/mux"
 	"github.com/zheng-ji/goSnowFlake"
 )
 
@@ -18,11 +20,12 @@ const (
 )
 
 type ErrResp struct {
-	Error string `json:"error"`
+	Status int    `json:"status"`
+	Error  string `json:"error"`
 }
 
 func GetErrorMsg(errMsg string) string {
-	errResp := &ErrResp{errMsg}
+	errResp := &ErrResp{Status: 200, Error: errMsg}
 	data, _ := json.Marshal(errResp)
 	return string(data)
 }
@@ -34,97 +37,174 @@ func NewUserServer() *UserServer {
 	}
 
 	return &UserServer{
-		userDataCenter: NewUserDataCenter(),
-		idGenerater:    idGenerater,
+		userDataCenter:     NewUserDataCenter(),
+		userRelationCenter: NewRelationShipCenter(),
+		idGenerater:        idGenerater,
 	}
 }
 
 type UserServer struct {
-	userDataCenter *UserDataCenter
-	idGenerater    *goSnowFlake.IdWorker
+	userDataCenter     *UserDataCenter
+	userRelationCenter *RelationShipCenter
+	idGenerater        *goSnowFlake.IdWorker
 }
 
-func (self *UserServer) RequestHandler(ctx *fasthttp.RequestCtx) {
-	if string(ctx.Path()) != SERVER_PATH {
-		fmt.Fprintf(ctx.Response.BodyWriter(),
-			"not valid path for: %s",
-			GetErrorMsg(string(ctx.Path())))
-		return
-	}
+func (self *UserServer) GetRelationshipHandler(w http.ResponseWriter, r *http.Request) {
+	defer func() {
+		if r := recover(); r != nil {
+			statckBuf := make([]byte, 64*1024)
+			runtime.Stack(statckBuf, false)
+			log.Fatalf("processor manager recover:%v, stack%s",
+				r, string(statckBuf))
+		}
+	}()
 
-	if ctx.IsGet() {
-		self.userListHandler(ctx)
+	if r.Method == "GET" {
+		userId := StringToInt64(GetUrlPathArg(r.URL.Path, 2))
+		if !user.CheckUsrIdValid(userId) {
+			self.writeErrorMessage(fmt.Sprintf("not valid userId: %d", userId), w)
+			return
+		}
+		userRelationShip := self.userRelationCenter.GetUserRelationShip(userId)
+		log.Printf("process one get user relationship req:%s", userRelationShip)
+		fmt.Fprintf(w, "%s", userRelationShip)
 		return
 	}
+	self.writeErrorMessage("not support method: "+r.Method, w)
+}
 
-	if ctx.IsPost() {
-		self.userAddHandler(ctx)
+type RelationShipPutData struct {
+	State string `json:"state"`
+}
+
+func (self *UserServer) PutRelationshipHandler(w http.ResponseWriter, r *http.Request) {
+	defer func() {
+		if r := recover(); r != nil {
+			statckBuf := make([]byte, 64*1024)
+			runtime.Stack(statckBuf, false)
+			log.Fatalf("processor manager recover:%v, stack%s",
+				r, string(statckBuf))
+		}
+	}()
+	if r.Method == "PUT" {
+		userId := StringToInt64(GetUrlPathArg(r.URL.Path, 2))
+		otherUserId := StringToInt64(GetUrlPathArg(r.URL.Path, 4))
+		if !user.CheckUsrIdValid(userId) ||
+			!user.CheckUsrIdValid(otherUserId) {
+			self.writeErrorMessage(
+				fmt.Sprintf("not valied user id: %d, other userid: %d",
+					userId, otherUserId), w)
+			return
+		}
+
+		data, err := ReadHttpRequestBody(r)
+		if err != nil {
+			self.writeErrorMessage("read post body get error: "+err.Error(), w)
+			return
+		}
+
+		decoder := json.NewDecoder(bytes.NewReader(data))
+		relationPutData := &RelationShipPutData{}
+		if err := decoder.Decode(relationPutData); err != nil {
+			self.writeErrorMessage("decode put data get error: "+err.Error(), w)
+			log.Println("body: " + string(data))
+			return
+		}
+		state := relationPutData.State
+		if !user.CheckRelationStateValid(state) {
+			self.writeErrorMessage(fmt.Sprintf("not valid state:%s", state), w)
+			return
+		}
+		log.Printf("userId: %d otherUserId: %d state:%s", userId, otherUserId, state)
+		relation := user.NewUserRelation(userId, otherUserId, state)
+		resp := self.userRelationCenter.UpdateRelationShip(relation)
+		log.Printf("process one update relationship req:%s", resp)
+		fmt.Fprintf(w, "%s", resp)
 		return
 	}
-	errMsg := "not support method: " + string(ctx.Method())
-	log.Println(errMsg)
-	fmt.Fprintf(ctx.Response.BodyWriter(), "%s", errMsg)
+	self.writeErrorMessage("not support method: "+r.Method, w)
+}
+
+func (self *UserServer) UserRequestHandler(w http.ResponseWriter, r *http.Request) {
+	defer func() {
+		if r := recover(); r != nil {
+			statckBuf := make([]byte, 64*1024)
+			runtime.Stack(statckBuf, false)
+			log.Fatalf("processor manager recover:%v, stack%s",
+				r, string(statckBuf))
+		}
+	}()
+
+	if r.Method == "GET" {
+		self.showAllUsersHandler(w, r)
+		return
+	} else if r.Method == "POST" {
+		self.userAddHandler(w, r)
+		return
+	}
+	self.writeErrorMessage("not support method: "+r.Method, w)
 }
 
 type UserPostData struct {
 	Name string `json:"name"`
 }
 
-func (self *UserServer) userAddHandler(ctx *fasthttp.RequestCtx) {
-	body := ctx.Request.Body()
-	decoder := json.NewDecoder(bytes.NewReader(body))
+func (self *UserServer) userAddHandler(w http.ResponseWriter, r *http.Request) {
+	data, err := ReadHttpRequestBody(r)
+	if err != nil {
+		self.writeErrorMessage("read post body get error: "+err.Error(), w)
+		return
+	}
+
+	decoder := json.NewDecoder(bytes.NewReader(data))
 	userPostData := &UserPostData{}
 	if err := decoder.Decode(userPostData); err != nil {
-		errMsg := "decode post data get error:" + err.Error()
-		log.Println(errMsg)
-		log.Println("body: " + string(body))
-		fmt.Fprintf(ctx.Response.BodyWriter(), "%s", GetErrorMsg(errMsg))
+		self.writeErrorMessage("decode post data get error: "+err.Error(), w)
+		log.Println("body: " + string(data))
 		return
 	}
 
 	userName := userPostData.Name
-	ok := self.userDataCenter.CheckValidAndUpdateForUser(userName)
+	ok := self.userDataCenter.CheckNameRepeadedAndUpdateNameSet(userName)
 	if !ok {
-		errMsg := "not valid user name: " + userName + ", please change user name!"
-		log.Println(errMsg)
-		fmt.Fprintf(ctx.Response.BodyWriter(), "%s", GetErrorMsg(errMsg))
+		self.writeErrorMessage(
+			"not valid username: "+userName+", please change user name!", w)
 		return
 	}
 
 	id, err := self.idGenerater.NextId()
 	if err != nil {
-		errMsg := "id generater get error: " + err.Error()
-		log.Println(errMsg)
-		fmt.Fprintf(ctx.Response.BodyWriter(), "%s", errMsg)
+		self.writeErrorMessage("id generater get error: "+err.Error(), w)
 		return
 	}
 
 	newUser := &user.User{
 		Name:        userName,
 		Id:          id,
-		CreatedTime: time.Now().Unix(),
+		Createdtime: time.Now().Unix(),
 	}
 	resp, err := self.userDataCenter.AddUser(newUser)
 	if err != nil {
-		errMsg := " add user get error: " + err.Error()
-		log.Println(errMsg)
-		fmt.Fprintf(ctx.Response.BodyWriter(), "%s", errMsg)
+		self.writeErrorMessage(" add user get error: "+err.Error(), w)
 		return
 	}
 	log.Println("process one user add req:" +
-		string(ctx.Host()) + "! get resp: " + string(resp))
-	fmt.Fprintf(ctx.Response.BodyWriter(), "%s", resp)
+		r.Host + "! get resp: " + string(resp))
+	fmt.Fprintf(w, "%s", resp)
 }
 
-func (self *UserServer) userListHandler(ctx *fasthttp.RequestCtx) {
+func (self *UserServer) showAllUsersHandler(w http.ResponseWriter, r *http.Request) {
 	resp, err := self.userDataCenter.UserList()
 	if err != nil {
-		errMsg := "some err with user list: " + err.Error()
-		log.Println(errMsg)
-		fmt.Fprintf(ctx.Response.BodyWriter(), "%s", GetErrorMsg(errMsg))
+		self.writeErrorMessage("some err with user list: "+err.Error(), w)
 		return
 	}
 	log.Println("process one show user list req:" +
-		string(ctx.Host()) + "! get resp: " + string(resp))
-	fmt.Fprintf(ctx.Response.BodyWriter(), "%s", resp)
+		r.Host + "! get resp: " + string(resp))
+	fmt.Fprintf(w, "%s", resp)
+}
+
+func (self *UserServer) writeErrorMessage(msg string, w http.ResponseWriter) {
+	log.Println(msg)
+	fmt.Fprintf(w, "%s", GetErrorMsg(msg))
 }

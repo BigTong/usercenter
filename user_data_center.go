@@ -2,6 +2,7 @@ package usercenter
 
 import (
 	"encoding/json"
+	"flag"
 	"log"
 	"sync"
 
@@ -10,26 +11,31 @@ import (
 )
 
 const (
-	DefaultUserListLen     = 10000
-	DefaultNewUserChan     = 100
-	DefaultBatchWriteDbNum = 10
+	DEFAULT_USER_LIST_Len   = 10000
+	DEFAULT_NEW_USER_CHAN   = 100
+	DEFAULT_BATCH_WRITE_NUM = 1
 )
 
 const (
 	ERROR_NAME_REPEATED = "repeated user name"
 )
 
+var (
+	postgresdbConfigFile = flag.String("postgres_config",
+		"conf/postgresdb_config.json", "")
+)
+
 func NewUserDataCenter() *UserDataCenter {
 	ret := &UserDataCenter{
-		userList:       make([]*user.User, DefaultUserListLen),
+		userList:       make([]*user.User, DEFAULT_USER_LIST_Len),
 		userListRWLock: &sync.RWMutex{},
 
 		userNameSet:   make(map[string]struct{}),
 		userNameMutex: &sync.Mutex{},
 
-		updateUserChan: make(chan *user.User, DefaultNewUserChan),
+		updateUserChan: make(chan *user.User, DEFAULT_NEW_USER_CHAN),
 
-		postgresDb:        db.NewPostgresQlDb(),
+		postgresDb:        db.NewPostgresQlDb(*postgresdbConfigFile),
 		needFlushUserData: false,
 	}
 
@@ -53,7 +59,7 @@ type UserDataCenter struct {
 	needFlushUserData bool
 }
 
-func (self *UserDataCenter) CheckValidAndUpdateForUser(userName string) bool {
+func (self *UserDataCenter) CheckNameRepeadedAndUpdateNameSet(userName string) bool {
 	if len(userName) == 0 {
 		return false
 	}
@@ -74,6 +80,7 @@ func (self *UserDataCenter) AddUser(user *user.User) ([]byte, error) {
 	self.userList = append(self.userList, user)
 	self.userListRWLock.Unlock()
 
+	self.updateUserChan <- user
 	return json.Marshal(user)
 }
 
@@ -103,14 +110,17 @@ func (self *UserDataCenter) loadUserListFromDb() {
 
 func (self *UserDataCenter) WriteNewUserDataToDb() {
 	cnt := 0
-	users := make([]*user.User, DefaultBatchWriteDbNum)
+	users := make([]*user.User, DEFAULT_BATCH_WRITE_NUM)
 	for {
 		user := <-self.updateUserChan
 		users = append(users, user)
 		cnt++
 		if (self.needFlushUserData && len(self.updateUserChan) == 0) ||
-			cnt == DefaultBatchWriteDbNum {
-			self.postgresDb.AddUser(users)
+			cnt == DEFAULT_BATCH_WRITE_NUM {
+			err := self.postgresDb.AddUser(users)
+			if err != nil {
+				panic("write db get error:" + err.Error())
+			}
 			cnt = 0
 			users = users[:0]
 		}

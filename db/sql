@@ -1,0 +1,20 @@
+CREATE DATABASE userdb;
+
+CREATE TABLE users(
+   _id            serial        NOT NULL,
+   id             bigint        PRIMARY KEY	NOT NULL,
+   name           varchar(16)	NOT NULL,
+   Description    varchar(200),
+   gender		  char(8),
+   age            smallint,
+   createdtime    bigint        NOT NULL,
+   address        varchar(100),
+   type           varchar(8)  
+);
+
+CREATE TABLE relationships(
+	_id            serial        NOT NULL,
+   user_id         bigint        NOT NULL,
+   state           char(16)       NOT NULL,
+   otherside       bigint        NOT NULL   
+);

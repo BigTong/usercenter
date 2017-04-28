@@ -17,7 +17,10 @@
 - [ ] add basic unitest(done part);
 - [ ] add bentch mark;
 - [ ] cache data on redis instead of in local mem;
-- [ ] Optimize and refact database sql;
+- [ ] Optimize and refact database;
+    - [ ] sharding the db;
+    - [ ] upsert impl for relation update;
+    - [ ] ....
 - [ ] refact code;
 
 ## benchmark result

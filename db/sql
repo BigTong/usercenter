@@ -16,5 +16,6 @@ CREATE TABLE relations(
 	_id            serial        NOT NULL,
    id              bigint        NOT NULL,
    state           varchar(16)       NOT NULL,
-   otherside       bigint        NOT NULL
+   otherside       bigint        NOT NULL,
+   type            varchar(16) NOT NULL
 );

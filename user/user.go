@@ -8,6 +8,7 @@ const (
 	RELATION_STATE_LIKED    = "liked"
 	RELATION_STATE_DISLIKED = "disliked"
 	RELATION_STATE_MATCHED  = "matched"
+	RELATION_TYPE           = "relationship"
 )
 
 type User struct {
@@ -23,9 +24,10 @@ type User struct {
 }
 
 type UserRelationShip struct {
-	Id        int64  `json:"id"`
+	Id        int64  `json:"-"`
 	State     string `json:"state"`
-	Otherside int64  `json:"other_side"`
+	Otherside int64  `json:"user_id,string"`
+	Type      string `json:"type"`
 }
 
 func UserRelationShipToString(relation *UserRelationShip) string {
@@ -38,6 +40,7 @@ func NewUserRelation(userId, otherUserId int64, state string) *UserRelationShip 
 		Id:        userId,
 		State:     state,
 		Otherside: otherUserId,
+		Type:      RELATION_TYPE,
 	}
 }
 

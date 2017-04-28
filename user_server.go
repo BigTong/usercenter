@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"runtime"
 	"time"
 
 	"usercenter/user"
@@ -74,15 +73,6 @@ func (self *UserServer) ShutdownRacefully() bool {
 }
 
 func (self *UserServer) GetRelationshipHandler(w http.ResponseWriter, r *http.Request) {
-	defer func() {
-		if r := recover(); r != nil {
-			statckBuf := make([]byte, 64*1024)
-			runtime.Stack(statckBuf, false)
-			log.Fatalf("processor manager recover:%v, stack%s",
-				r, string(statckBuf))
-		}
-	}()
-
 	if r.Method == "GET" {
 		userId := StringToInt64(GetUrlPathArg(r.URL.Path, 2))
 		if !user.CheckUsrIdValid(userId) {
@@ -102,14 +92,6 @@ type RelationShipPutData struct {
 }
 
 func (self *UserServer) PutRelationshipHandler(w http.ResponseWriter, r *http.Request) {
-	defer func() {
-		if r := recover(); r != nil {
-			statckBuf := make([]byte, 64*1024)
-			runtime.Stack(statckBuf, false)
-			log.Fatalf("processor manager recover:%v, stack%s",
-				r, string(statckBuf))
-		}
-	}()
 	if r.Method == "PUT" {
 		userId := StringToInt64(GetUrlPathArg(r.URL.Path, 2))
 		otherUserId := StringToInt64(GetUrlPathArg(r.URL.Path, 4))
@@ -150,15 +132,6 @@ func (self *UserServer) PutRelationshipHandler(w http.ResponseWriter, r *http.Re
 }
 
 func (self *UserServer) UserRequestHandler(w http.ResponseWriter, r *http.Request) {
-	defer func() {
-		if r := recover(); r != nil {
-			statckBuf := make([]byte, 64*1024)
-			runtime.Stack(statckBuf, false)
-			log.Fatalf("processor manager recover:%v, stack%s",
-				r, string(statckBuf))
-		}
-	}()
-
 	if r.Method == "GET" {
 		self.showAllUsersHandler(w, r)
 		return

@@ -3,13 +3,13 @@ package db
 import (
 	"encoding/json"
 	"io/ioutil"
-	"log"
 	"os"
 	"strings"
 	"time"
 
 	"usercenter/user"
 
+	"github.com/BigTong/common/log"
 	"gopkg.in/pg.v3"
 )
 
@@ -30,21 +30,21 @@ type PostgresDBConfig struct {
 func NewPostgresDBConfig(configFile string) *PostgresDBConfig {
 	file, err := os.Open(configFile)
 	if err != nil {
-		log.Printf("open file get error:%s", err.Error())
+		log.FInfo("open file get error:%s", err.Error())
 		return nil
 	}
 	defer file.Close()
 
 	data, err := ioutil.ReadAll(file)
 	if err != nil {
-		log.Printf("read file get error:%s", err.Error())
+		log.FInfo("read file get error:%s", err.Error())
 		return nil
 	}
 
 	dbConfig := &PostgresDBConfig{}
 	err = json.Unmarshal(data, dbConfig)
 	if err != nil {
-		log.Printf("unmarshal config file get error:%s", err.Error())
+		log.FInfo("unmarshal config file get error:%s", err.Error())
 		return nil
 	}
 	return dbConfig
@@ -58,7 +58,7 @@ type PostgresQlDb struct {
 func NewPostgresQlDb(configFile string) *PostgresQlDb {
 	config := NewPostgresDBConfig(configFile)
 	if config == nil {
-		panic("failed new config")
+		log.FFatal("failed new config", "")
 	}
 
 	return NewPostgredQlDbWithConfig(config)
@@ -79,7 +79,7 @@ func NewPostgredQlDbWithConfig(config *PostgresDBConfig) *PostgresQlDb {
 	}
 	ret.db = pg.Connect(ret.dbOptions)
 	if ret.db == nil {
-		panic("failed to connect db")
+		log.FFatal("failed to connect db", "")
 	}
 	return ret
 }
@@ -148,16 +148,16 @@ func (self *PostgresQlDb) UpdateUserRelation(
 	otherSideRelation := self.GetRelationWithOtherUserId(relation.Otherside, relation.Id)
 
 	if otherSideRelation != nil {
-		log.Printf("otherRelation:%d  %s %d",
+		log.FInfo("otherRelation:%d  %s %d",
 			otherSideRelation.Id, otherSideRelation.State, otherSideRelation.Otherside)
 	} else {
-		log.Printf("get nil other relation:%s", relation.Otherside)
+		log.FInfo("get nil other relation:%s", relation.Otherside)
 	}
 
 	if relation.State == user.RELATION_STATE_LIKED &&
 		otherSideRelation != nil &&
 		strings.EqualFold(otherSideRelation.State, user.RELATION_STATE_LIKED) {
-		log.Printf("matched:%d", relation.Id)
+		log.FInfo("matched:%d", relation.Id)
 		relation.State = user.RELATION_STATE_MATCHED
 		_, err := self.db.ExecOne(
 			`UPDATE relations SET state=? WHERE id=? AND otherside=?`,
@@ -193,6 +193,20 @@ func (self *PostgresQlDb) GetUserRelation(
 		return nil, err
 	}
 	return relations, nil
+}
+
+func (self *PostgresQlDb) GetAllUserRelationsId() []int64 {
+	ret := []int64{}
+	relations := []*user.UserRelationShip{}
+	_, err := self.db.Query(&relations,
+		`SELECT id, state, otherside, type FROM relations`)
+	if err != nil {
+		return ret
+	}
+	for _, r := range relations {
+		ret = append(ret, r.Id)
+	}
+	return ret
 }
 
 func (self *PostgresQlDb) Close() error {

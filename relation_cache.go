@@ -22,7 +22,7 @@ type UserRelations struct {
 
 func (u *UserRelations) UserRelations() string {
 	u.rwLock.RLock()
-	defer u.rwLock.Unlock()
+	defer u.rwLock.RUnlock()
 	data, _ := json.Marshal(u.relationShips)
 	return string(data)
 }

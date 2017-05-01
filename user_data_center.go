@@ -3,17 +3,18 @@ package usercenter
 import (
 	"encoding/json"
 	"flag"
-	"log"
 	"sync"
 	"time"
 
 	"usercenter/db"
 	"usercenter/user"
+
+	"github.com/BigTong/common/log"
 )
 
 const (
-	DEFAULT_USER_LIST_Len   = 10000
-	DEFAULT_NEW_USER_CHAN   = 100
+	DEFAULT_USER_LIST_Len   = 1000000
+	DEFAULT_NEW_USER_CHAN   = 10000
 	DEFAULT_BATCH_WRITE_NUM = 1
 )
 
@@ -107,7 +108,7 @@ func (self *UserDataCenter) loadUserListFromDb() {
 	var err error
 	self.userList, err = self.postgresDb.LoadUserList()
 	if err != nil {
-		log.Fatalln("load user list get error: ", err.Error())
+		log.FFatal("load user list get error: %s", err.Error())
 	}
 
 	for _, u := range self.userList {
@@ -125,10 +126,10 @@ func (self *UserDataCenter) WriteNewUserDataToDb() {
 		cnt++
 		if (self.needFlushUserData && len(self.updateUserChan) == 0) ||
 			cnt == DEFAULT_BATCH_WRITE_NUM {
-			log.Printf("get user:%v len:%d", *users[0], len(users))
+			log.FInfo("get user:%v len:%d", *users[0], len(users))
 			err := self.postgresDb.AddUser(users)
 			if err != nil {
-				log.Panicln("write db get error:" + err.Error())
+				log.FFatal("write db get error:%s", err.Error())
 			}
 			cnt = 0
 			users = users[:0]

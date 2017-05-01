@@ -14,8 +14,8 @@
 - [x] simple rate limit;
 - [x] test basic api;
 - [x] design cache;
-- [ ] add basic unitest(done part);
-- [ ] add bentch mark;
+- [x] add basic unitest(done part);
+- [x] add bentch mark;
 - [ ] cache data on redis instead of in local mem;
 - [ ] Optimize and refact database;
     - [ ] sharding the db;
@@ -24,3 +24,8 @@
 - [ ] refact code;
 
 ## benchmark result
+- BenchmarkGetUserRelation-8        2000            796181 ns/op
+- BenchmarkAddUserRelation-8        1000           1238236 ns/op
+- BenchmarkGetUserList-8        2000            609328 ns/op
+- BenchmarkAddUserData-8        2000            687842 ns/op
+

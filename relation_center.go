@@ -2,11 +2,12 @@ package usercenter
 
 import (
 	"encoding/json"
-	"log"
 	"time"
 
 	"usercenter/db"
 	"usercenter/user"
+
+	"github.com/BigTong/common/log"
 )
 
 const (
@@ -38,7 +39,7 @@ func (self *RelationShipCenter) GetUserRelationShip(userId int64) string {
 	}
 	relationsArray, err := self.postgresDb.GetUserRelation(userId)
 	if err != nil {
-		log.Printf("read user relations get err: %s", err.Error())
+		log.FInfo("read user relations get err: %s", err.Error())
 		return "[]"
 	}
 
@@ -73,7 +74,7 @@ func (self *RelationShipCenter) UpdateRelationShip(relation *user.UserRelationSh
 
 	newRelation, err := self.postgresDb.UpdateUserRelation(relation)
 	if err != nil {
-		log.Panic("update postgres db get err:" + err.Error())
+		log.FFatal("update postgres db get err:%s", err.Error())
 	}
 	if ok {
 		userRelations.UpdateUserRelation(newRelation)
@@ -105,7 +106,7 @@ func (self *RelationShipCenter) writeUserRelationsToDb() {
 			cnt == DEFAULT_BATCH_WRITE_NUM {
 			err := self.postgresDb.UpdateUserRelations(relations)
 			if err != nil {
-				log.Panic("write db get error:" + err.Error())
+				log.FFatal("write db get error:%s", err.Error())
 			}
 			cnt = 0
 			relations = relations[:0]

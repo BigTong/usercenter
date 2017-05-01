@@ -3,7 +3,7 @@ CREATE DATABASE userdb;
 CREATE TABLE users(
    _id            serial        NOT NULL,
    id             bigint        PRIMARY KEY	NOT NULL,
-   name           varchar(16)	NOT NULL,
+   name           varchar(50)	NOT NULL,
    Description    varchar(200),
    gender		  char(8),
    age            smallint,

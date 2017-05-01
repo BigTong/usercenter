@@ -1,0 +1,5 @@
+{
+	"file_name":"user_server.log",
+	"file_path":"./log/",
+	"max_line_num":2000000
+}

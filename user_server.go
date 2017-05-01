@@ -4,13 +4,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"time"
 
 	"usercenter/user"
 
 	//"github.com/gorilla/mux"
+	"github.com/BigTong/common/log"
 	"github.com/juju/ratelimit"
 	"github.com/zheng-ji/goSnowFlake"
 )
@@ -33,7 +33,7 @@ func GetErrorMsg(errMsg string) string {
 func NewUserServer() *UserServer {
 	idGenerater, err := goSnowFlake.NewIdWorker(1)
 	if err != nil {
-		log.Fatalf("new id generater get error:%s", err.Error())
+		log.FFatal("new id generater get error:%s", err.Error())
 	}
 
 	return &UserServer{
@@ -96,7 +96,7 @@ func (self *UserServer) GetRelationshipHandler(w http.ResponseWriter, r *http.Re
 			return
 		}
 		userRelationShip := self.userRelationCenter.GetUserRelationShip(userId)
-		log.Printf("process one get user relationship req:%s", userRelationShip)
+		log.FInfo("process one get user relationship req:%s", userRelationShip)
 		fmt.Fprintf(w, "%s", userRelationShip)
 		return
 	}
@@ -134,7 +134,7 @@ func (self *UserServer) PutRelationshipHandler(w http.ResponseWriter, r *http.Re
 		relationPutData := &RelationShipPutData{}
 		if err := decoder.Decode(relationPutData); err != nil {
 			self.writeErrorMessage("decode put data get error: "+err.Error(), w)
-			log.Println("body: " + string(data))
+			log.FInfo("body:%s", string(data))
 			return
 		}
 		state := relationPutData.State
@@ -142,10 +142,10 @@ func (self *UserServer) PutRelationshipHandler(w http.ResponseWriter, r *http.Re
 			self.writeErrorMessage(fmt.Sprintf("not valid state:%s", state), w)
 			return
 		}
-		log.Printf("userId: %d otherUserId: %d state:%s", userId, otherUserId, state)
+		log.FInfo("userId: %d otherUserId: %d state:%s", userId, otherUserId, state)
 		relation := user.NewUserRelation(userId, otherUserId, state)
 		resp := self.userRelationCenter.UpdateRelationShip(relation)
-		log.Printf("process one update relationship req:%s", resp)
+		log.FInfo("process one update relationship req:%s", resp)
 		fmt.Fprintf(w, "%s", resp)
 		return
 	}
@@ -168,11 +168,15 @@ type UserPostData struct {
 }
 
 func (self *UserServer) userAddHandler(w http.ResponseWriter, r *http.Request) {
-	hasToken := self.userWriteBucket.WaitMaxDuration(1, 10*time.Millisecond)
-	if !hasToken {
-		self.writeErrorMessage("no token", w)
-		return
-	}
+	/*
+		hasToken := self.userWriteBucket.WaitMaxDuration(1, 10*time.Millisecond)
+		if !hasToken {
+			self.writeErrorMessage("no token", w)
+			return
+		}
+	*/
+
+	startTime := time.Now().UnixNano()
 
 	data, err := ReadHttpRequestBody(r)
 	if err != nil {
@@ -184,9 +188,11 @@ func (self *UserServer) userAddHandler(w http.ResponseWriter, r *http.Request) {
 	userPostData := &UserPostData{}
 	if err := decoder.Decode(userPostData); err != nil {
 		self.writeErrorMessage("decode post data get error: "+err.Error(), w)
-		log.Println("body: " + string(data))
+		log.FInfo("body:%s", string(data))
 		return
 	}
+
+	endOne := time.Now().UnixNano()
 
 	userName := userPostData.Name
 	ok := self.userDataCenter.CheckNameRepeadedAndUpdateNameSet(userName)
@@ -196,25 +202,34 @@ func (self *UserServer) userAddHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	endTwo := time.Now().UnixNano()
+
 	id, err := self.idGenerater.NextId()
 	if err != nil {
 		self.writeErrorMessage("id generater get error: "+err.Error(), w)
 		return
 	}
 
+	endThree := time.Now().UnixNano()
 	newUser := &user.User{
 		Name:        userName,
 		Id:          id,
-		Createdtime: time.Now().Unix(),
+		Createdtime: time.Now().UnixNano(),
 	}
 	resp, err := self.userDataCenter.AddUser(newUser)
 	if err != nil {
 		self.writeErrorMessage(" add user get error: "+err.Error(), w)
 		return
 	}
-	log.Println("process one user add req:" +
-		r.Host + "! get resp: " + string(resp))
+	log.FInfo("process one user add req: %s! get resp:",
+		r.Host, string(resp))
 	fmt.Fprintf(w, "%s", resp)
+	endFour := time.Now().UnixNano()
+	log.FInfo("cost time:%d %d %d %d",
+		(endOne-startTime)/1000,
+		(endTwo-endOne)/1000,
+		(endThree-endTwo)/1000,
+		(endFour-endThree)/1000)
 }
 
 func (self *UserServer) showAllUsersHandler(w http.ResponseWriter, r *http.Request) {
@@ -229,12 +244,12 @@ func (self *UserServer) showAllUsersHandler(w http.ResponseWriter, r *http.Reque
 		self.writeErrorMessage("some err with user list: "+err.Error(), w)
 		return
 	}
-	log.Println("process one show user list req:" +
-		r.Host + "! get resp: " + string(resp))
+	log.FInfo("process one show user list req: %s ! get resp: %s",
+		r.Host, string(resp))
 	fmt.Fprintf(w, "%s", resp)
 }
 
 func (self *UserServer) writeErrorMessage(msg string, w http.ResponseWriter) {
-	log.Println(msg)
+	log.FInfo("%s", msg)
 	fmt.Fprintf(w, "%s", GetErrorMsg(msg))
 }

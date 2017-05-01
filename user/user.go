@@ -13,7 +13,7 @@ const (
 
 type User struct {
 	_id         int64
-	Id          int64  `json:"id"`
+	Id          int64  `json:"id,omitempty"`
 	Name        string `json:"name"`
 	Description string `json:"description,omitempty"`
 	Gender      string `json:"gender,omitempty"`
@@ -25,9 +25,9 @@ type User struct {
 
 type UserRelationShip struct {
 	Id        int64  `json:"-"`
-	State     string `json:"state"`
-	Otherside int64  `json:"user_id,string"`
-	Type      string `json:"type"`
+	State     string `json:"state,omitempty"`
+	Otherside int64  `json:"user_id,string,omitempty"`
+	Type      string `json:"type,omitempty"`
 }
 
 func UserRelationShipToString(relation *UserRelationShip) string {

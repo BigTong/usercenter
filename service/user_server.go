@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"log"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
@@ -12,6 +11,7 @@ import (
 
 	"usercenter"
 
+	"github.com/BigTong/common/log"
 	"github.com/gorilla/mux"
 )
 
@@ -21,9 +21,10 @@ var (
 
 func main() {
 	runtime.GOMAXPROCS(4)
-	log.SetFlags(log.Lshortfile | log.LstdFlags)
+	logConfig := flag.String("log_file", "conf/log.json", "")
 	flag.Parse()
 
+	log.InitFileLoggerFromConfigFile(*logConfig, log.INFO)
 	service := usercenter.NewUserServer()
 
 	router := mux.NewRouter()
@@ -43,5 +44,5 @@ func main() {
 		}
 	}()
 
-	log.Fatal(http.ListenAndServe(*addr, router))
+	log.FFatal("%s", http.ListenAndServe(*addr, router).Error())
 }

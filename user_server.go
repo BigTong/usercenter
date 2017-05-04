@@ -59,17 +59,17 @@ type UserServer struct {
 	userRelationsReadBucket *ratelimit.Bucket
 }
 
-func (self *UserServer) ShutdownRacefully() bool {
+func (us *UserServer) ShutdownRacefully() bool {
 	signal := make(chan int, 2)
 
 	go func() {
-		if self.userDataCenter.WaitingForDataWriteFinished() {
+		if us.userDataCenter.WaitingForDataWriteFinished() {
 			signal <- 1
 		}
 	}()
 
 	go func() {
-		if self.userRelationCenter.waitingForDataWriteFinished() {
+		if us.userRelationCenter.waitingForDataWriteFinished() {
 			signal <- 1
 		}
 	}()
@@ -83,34 +83,34 @@ func (self *UserServer) ShutdownRacefully() bool {
 	return true
 }
 
-func (self *UserServer) GetRelationshipHandler(w http.ResponseWriter, r *http.Request) {
-	hasToken := self.userRelationsReadBucket.WaitMaxDuration(1, 10*time.Millisecond)
+func (us *UserServer) GetRelationshipHandler(w http.ResponseWriter, r *http.Request) {
+	hasToken := us.userRelationsReadBucket.WaitMaxDuration(1, 10*time.Millisecond)
 	if !hasToken {
-		self.writeErrorMessage("no token", w)
+		us.writeErrorMessage("no token", w)
 		return
 	}
 	if r.Method == "GET" {
 		userId := StringToInt64(GetUrlPathArg(r.URL.Path, 2))
 		if !user.CheckUsrIdValid(userId) {
-			self.writeErrorMessage(fmt.Sprintf("not valid userId: %d", userId), w)
+			us.writeErrorMessage(fmt.Sprintf("not valid userId: %d", userId), w)
 			return
 		}
-		userRelationShip := self.userRelationCenter.GetUserRelationShip(userId)
+		userRelationShip := us.userRelationCenter.GetUserRelationShip(userId)
 		log.FInfo("process one get user relationship req:%s", userRelationShip)
 		fmt.Fprintf(w, "%s", userRelationShip)
 		return
 	}
-	self.writeErrorMessage("not support method: "+r.Method, w)
+	us.writeErrorMessage("not support method: "+r.Method, w)
 }
 
 type RelationShipPutData struct {
 	State string `json:"state"`
 }
 
-func (self *UserServer) PutRelationshipHandler(w http.ResponseWriter, r *http.Request) {
-	hasToken := self.userRelationAddBucket.WaitMaxDuration(1, 10*time.Millisecond)
+func (us *UserServer) PutRelationshipHandler(w http.ResponseWriter, r *http.Request) {
+	hasToken := us.userRelationAddBucket.WaitMaxDuration(1, 10*time.Millisecond)
 	if !hasToken {
-		self.writeErrorMessage("no token", w)
+		us.writeErrorMessage("no token", w)
 		return
 	}
 	if r.Method == "PUT" {
@@ -118,7 +118,7 @@ func (self *UserServer) PutRelationshipHandler(w http.ResponseWriter, r *http.Re
 		otherUserId := StringToInt64(GetUrlPathArg(r.URL.Path, 4))
 		if !user.CheckUsrIdValid(userId) ||
 			!user.CheckUsrIdValid(otherUserId) {
-			self.writeErrorMessage(
+			us.writeErrorMessage(
 				fmt.Sprintf("not valied user id: %d, other userid: %d",
 					userId, otherUserId), w)
 			return
@@ -126,52 +126,52 @@ func (self *UserServer) PutRelationshipHandler(w http.ResponseWriter, r *http.Re
 
 		data, err := ReadHttpRequestBody(r)
 		if err != nil {
-			self.writeErrorMessage("read post body get error: "+err.Error(), w)
+			us.writeErrorMessage("read post body get error: "+err.Error(), w)
 			return
 		}
 
 		decoder := json.NewDecoder(bytes.NewReader(data))
 		relationPutData := &RelationShipPutData{}
 		if err := decoder.Decode(relationPutData); err != nil {
-			self.writeErrorMessage("decode put data get error: "+err.Error(), w)
+			us.writeErrorMessage("decode put data get error: "+err.Error(), w)
 			log.FInfo("body:%s", string(data))
 			return
 		}
 		state := relationPutData.State
 		if !user.CheckRelationStateValid(state) {
-			self.writeErrorMessage(fmt.Sprintf("not valid state:%s", state), w)
+			us.writeErrorMessage(fmt.Sprintf("not valid state:%s", state), w)
 			return
 		}
 		log.FInfo("userId: %d otherUserId: %d state:%s", userId, otherUserId, state)
 		relation := user.NewUserRelation(userId, otherUserId, state)
-		resp := self.userRelationCenter.UpdateRelationShip(relation)
+		resp := us.userRelationCenter.UpdateRelationShip(relation)
 		log.FInfo("process one update relationship req:%s", resp)
 		fmt.Fprintf(w, "%s", resp)
 		return
 	}
-	self.writeErrorMessage("not support method: "+r.Method, w)
+	us.writeErrorMessage("not support method: "+r.Method, w)
 }
 
-func (self *UserServer) UserRequestHandler(w http.ResponseWriter, r *http.Request) {
+func (us *UserServer) UserRequestHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
-		self.showAllUsersHandler(w, r)
+		us.showAllUsersHandler(w, r)
 		return
 	} else if r.Method == "POST" {
-		self.userAddHandler(w, r)
+		us.userAddHandler(w, r)
 		return
 	}
-	self.writeErrorMessage("not support method: "+r.Method, w)
+	us.writeErrorMessage("not support method: "+r.Method, w)
 }
 
 type UserPostData struct {
 	Name string `json:"name"`
 }
 
-func (self *UserServer) userAddHandler(w http.ResponseWriter, r *http.Request) {
+func (us *UserServer) userAddHandler(w http.ResponseWriter, r *http.Request) {
 	/*
-		hasToken := self.userWriteBucket.WaitMaxDuration(1, 10*time.Millisecond)
+		hasToken := us.userWriteBucket.WaitMaxDuration(1, 10*time.Millisecond)
 		if !hasToken {
-			self.writeErrorMessage("no token", w)
+			us.writeErrorMessage("no token", w)
 			return
 		}
 	*/
@@ -180,14 +180,14 @@ func (self *UserServer) userAddHandler(w http.ResponseWriter, r *http.Request) {
 
 	data, err := ReadHttpRequestBody(r)
 	if err != nil {
-		self.writeErrorMessage("read post body get error: "+err.Error(), w)
+		us.writeErrorMessage("read post body get error: "+err.Error(), w)
 		return
 	}
 
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	userPostData := &UserPostData{}
 	if err := decoder.Decode(userPostData); err != nil {
-		self.writeErrorMessage("decode post data get error: "+err.Error(), w)
+		us.writeErrorMessage("decode post data get error: "+err.Error(), w)
 		log.FInfo("body:%s", string(data))
 		return
 	}
@@ -195,18 +195,18 @@ func (self *UserServer) userAddHandler(w http.ResponseWriter, r *http.Request) {
 	endOne := time.Now().UnixNano()
 
 	userName := userPostData.Name
-	ok := self.userDataCenter.CheckNameRepeadedAndUpdateNameSet(userName)
+	ok := us.userDataCenter.CheckNameRepeadedAndUpdateNameSet(userName)
 	if !ok {
-		self.writeErrorMessage(
+		us.writeErrorMessage(
 			"not valid username: "+userName+", please change user name!", w)
 		return
 	}
 
 	endTwo := time.Now().UnixNano()
 
-	id, err := self.idGenerater.NextId()
+	id, err := us.idGenerater.NextId()
 	if err != nil {
-		self.writeErrorMessage("id generater get error: "+err.Error(), w)
+		us.writeErrorMessage("id generater get error: "+err.Error(), w)
 		return
 	}
 
@@ -216,9 +216,9 @@ func (self *UserServer) userAddHandler(w http.ResponseWriter, r *http.Request) {
 		Id:          id,
 		Createdtime: time.Now().UnixNano(),
 	}
-	resp, err := self.userDataCenter.AddUser(newUser)
+	resp, err := us.userDataCenter.AddUser(newUser)
 	if err != nil {
-		self.writeErrorMessage(" add user get error: "+err.Error(), w)
+		us.writeErrorMessage(" add user get error: "+err.Error(), w)
 		return
 	}
 	log.FInfo("process one user add req: %s! get resp:",
@@ -232,16 +232,16 @@ func (self *UserServer) userAddHandler(w http.ResponseWriter, r *http.Request) {
 		(endFour-endThree)/1000)
 }
 
-func (self *UserServer) showAllUsersHandler(w http.ResponseWriter, r *http.Request) {
-	hasToken := self.userReadBucket.WaitMaxDuration(1, 10*time.Millisecond)
+func (us *UserServer) showAllUsersHandler(w http.ResponseWriter, r *http.Request) {
+	hasToken := us.userReadBucket.WaitMaxDuration(1, 10*time.Millisecond)
 	if !hasToken {
-		self.writeErrorMessage("no token", w)
+		us.writeErrorMessage("no token", w)
 		return
 	}
 
-	resp, err := self.userDataCenter.UserList()
+	resp, err := us.userDataCenter.UserList()
 	if err != nil {
-		self.writeErrorMessage("some err with user list: "+err.Error(), w)
+		us.writeErrorMessage("some err with user list: "+err.Error(), w)
 		return
 	}
 	log.FInfo("process one show user list req: %s ! get resp: %s",
@@ -249,7 +249,7 @@ func (self *UserServer) showAllUsersHandler(w http.ResponseWriter, r *http.Reque
 	fmt.Fprintf(w, "%s", resp)
 }
 
-func (self *UserServer) writeErrorMessage(msg string, w http.ResponseWriter) {
+func (us *UserServer) writeErrorMessage(msg string, w http.ResponseWriter) {
 	log.FInfo("%s", msg)
 	fmt.Fprintf(w, "%s", GetErrorMsg(msg))
 }

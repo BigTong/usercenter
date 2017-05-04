@@ -84,10 +84,10 @@ func NewPostgredQlDbWithConfig(config *PostgresDBConfig) *PostgresQlDb {
 	return ret
 }
 
-func (self *PostgresQlDb) AddUser(users []*user.User) error {
+func (pq *PostgresQlDb) AddUser(users []*user.User) error {
 	// ToDo(batch insert)
 	for _, user := range users {
-		_, err := self.db.ExecOne(`INSERT INTO users
+		_, err := pq.db.ExecOne(`INSERT INTO users
 			(id, name, description, gender, age, createdtime, address, type)
 			 VALUES (?id, ?name, ?description, ?gender, ?age, ?createdtime, ?address, ?type)`, user)
 		if err != nil {
@@ -97,9 +97,9 @@ func (self *PostgresQlDb) AddUser(users []*user.User) error {
 	return nil
 }
 
-func (self *PostgresQlDb) GetUser(name string) *user.User {
+func (pq *PostgresQlDb) GetUser(name string) *user.User {
 	user := &user.User{}
-	_, err := self.db.QueryOne(&user,
+	_, err := pq.db.QueryOne(&user,
 		`SELECT id, name, description, gender, age, createdtime, address, type FROM users WHERE name=?`,
 		name)
 	if err != nil {
@@ -108,9 +108,9 @@ func (self *PostgresQlDb) GetUser(name string) *user.User {
 	return user
 }
 
-func (self *PostgresQlDb) LoadUserList() ([]*user.User, error) {
+func (pq *PostgresQlDb) LoadUserList() ([]*user.User, error) {
 	userList := []*user.User{}
-	_, err := self.db.Query(&userList,
+	_, err := pq.db.Query(&userList,
 		`SELECT id, name, description, gender, age, createdtime, address, type FROM users`)
 	if err != nil {
 		return nil, err
@@ -118,10 +118,10 @@ func (self *PostgresQlDb) LoadUserList() ([]*user.User, error) {
 	return userList, nil
 }
 
-func (self *PostgresQlDb) UpdateUserRelations(
+func (pq *PostgresQlDb) UpdateUserRelations(
 	relations []*user.UserRelationShip) error {
 	for _, relation := range relations {
-		_, err := self.UpdateUserRelation(relation)
+		_, err := pq.UpdateUserRelation(relation)
 		if err != nil {
 			return err
 		}
@@ -130,10 +130,10 @@ func (self *PostgresQlDb) UpdateUserRelations(
 	return nil
 }
 
-func (self *PostgresQlDb) GetRelationWithOtherUserId(userId,
+func (pq *PostgresQlDb) GetRelationWithOtherUserId(userId,
 	otherUserId int64) *user.UserRelationShip {
 	relation := &user.UserRelationShip{}
-	_, err := self.db.QueryOne(relation,
+	_, err := pq.db.QueryOne(relation,
 		`SELECT id, state, otherside,type FROM relations 
 		WHERE id=? AND otherside=?`, userId, otherUserId)
 	if err != nil {
@@ -142,10 +142,10 @@ func (self *PostgresQlDb) GetRelationWithOtherUserId(userId,
 	return relation
 }
 
-func (self *PostgresQlDb) UpdateUserRelation(
+func (pq *PostgresQlDb) UpdateUserRelation(
 	relation *user.UserRelationShip) (*user.UserRelationShip, error) {
 
-	otherSideRelation := self.GetRelationWithOtherUserId(relation.Otherside, relation.Id)
+	otherSideRelation := pq.GetRelationWithOtherUserId(relation.Otherside, relation.Id)
 
 	if otherSideRelation != nil {
 		log.FInfo("otherRelation:%d  %s %d",
@@ -159,13 +159,13 @@ func (self *PostgresQlDb) UpdateUserRelation(
 		strings.EqualFold(otherSideRelation.State, user.RELATION_STATE_LIKED) {
 		log.FInfo("matched:%d", relation.Id)
 		relation.State = user.RELATION_STATE_MATCHED
-		_, err := self.db.ExecOne(
+		_, err := pq.db.ExecOne(
 			`UPDATE relations SET state=? WHERE id=? AND otherside=?`,
 			user.RELATION_STATE_MATCHED, relation.Otherside, relation.Id)
 		if err != nil {
 			return nil, err
 		}
-		_, err = self.db.ExecOne(`INSERT INTO relations
+		_, err = pq.db.ExecOne(`INSERT INTO relations
 			(id, state, otherside, type)
 			 VALUES (?id, ?state, ?otherside, ?type)`, relation)
 		if err != nil {
@@ -174,7 +174,7 @@ func (self *PostgresQlDb) UpdateUserRelation(
 		return relation, nil
 	}
 
-	_, err := self.db.ExecOne(`INSERT INTO relations
+	_, err := pq.db.ExecOne(`INSERT INTO relations
 			(id, state, otherside, type)
 			VALUES(?id, ?state, ?otherside, ?type)`, relation)
 	if err != nil {
@@ -183,10 +183,10 @@ func (self *PostgresQlDb) UpdateUserRelation(
 	return relation, nil
 }
 
-func (self *PostgresQlDb) GetUserRelation(
+func (pq *PostgresQlDb) GetUserRelation(
 	userId int64) ([]*user.UserRelationShip, error) {
 	relations := []*user.UserRelationShip{}
-	_, err := self.db.Query(&relations,
+	_, err := pq.db.Query(&relations,
 		`SELECT id, state, otherside, type FROM relations where id=?`,
 		userId)
 	if err != nil {
@@ -195,10 +195,10 @@ func (self *PostgresQlDb) GetUserRelation(
 	return relations, nil
 }
 
-func (self *PostgresQlDb) GetAllUserRelationsId() []int64 {
+func (pq *PostgresQlDb) GetAllUserRelationsId() []int64 {
 	ret := []int64{}
 	relations := []*user.UserRelationShip{}
-	_, err := self.db.Query(&relations,
+	_, err := pq.db.Query(&relations,
 		`SELECT id, state, otherside, type FROM relations`)
 	if err != nil {
 		return ret
@@ -209,9 +209,9 @@ func (self *PostgresQlDb) GetAllUserRelationsId() []int64 {
 	return ret
 }
 
-func (self *PostgresQlDb) Close() error {
-	if self.db != nil {
-		return self.db.Close()
+func (pq *PostgresQlDb) Close() error {
+	if pq.db != nil {
+		return pq.db.Close()
 	}
 	return nil
 }

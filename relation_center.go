@@ -32,36 +32,36 @@ type RelationShipCenter struct {
 	needFlushRelationData bool
 }
 
-func (self *RelationShipCenter) GetUserRelationShip(userId int64) string {
-	relations, ok := self.cache.GetUserRelations(userId)
+func (rls *RelationShipCenter) GetUserRelationShip(userId int64) string {
+	relations, ok := rls.cache.GetUserRelations(userId)
 	if ok {
 		return relations.UserRelations()
 	}
-	relationsArray, err := self.postgresDb.GetUserRelation(userId)
+	relationsArray, err := rls.postgresDb.GetUserRelation(userId)
 	if err != nil {
 		log.FInfo("read user relations get err: %s", err.Error())
 		return "[]"
 	}
 
-	self.cache.SetUserRelations(userId, relationsArray[0:])
+	rls.cache.SetUserRelations(userId, relationsArray[0:])
 
 	data, _ := json.Marshal(relationsArray)
 	return string(data)
 }
 
-func (self *RelationShipCenter) UpdateRelationShip(relation *user.UserRelationShip) string {
-	userRelations, ok := self.cache.GetUserRelations(relation.Id)
+func (rls *RelationShipCenter) UpdateRelationShip(relation *user.UserRelationShip) string {
+	userRelations, ok := rls.cache.GetUserRelations(relation.Id)
 	if relation.State == user.RELATION_STATE_DISLIKED {
-		self.relationsToDb <- relation
+		rls.relationsToDb <- relation
 		if ok {
 			userRelations.UpdateUserRelation(relation)
 		}
 		return user.UserRelationShipToString(relation)
 	}
 
-	otherUserRelations, otherOk := self.cache.GetUserRelations(relation.Otherside)
+	otherUserRelations, otherOk := rls.cache.GetUserRelations(relation.Otherside)
 	if otherOk && otherUserRelations.LikeMe(relation.Id) {
-		self.relationsToDb <- relation
+		rls.relationsToDb <- relation
 		relation.State = user.RELATION_STATE_MATCHED
 		if ok {
 			userRelations.UpdateUserRelation(relation)
@@ -72,7 +72,7 @@ func (self *RelationShipCenter) UpdateRelationShip(relation *user.UserRelationSh
 		return ret
 	}
 
-	newRelation, err := self.postgresDb.UpdateUserRelation(relation)
+	newRelation, err := rls.postgresDb.UpdateUserRelation(relation)
 	if err != nil {
 		log.FFatal("update postgres db get err:%s", err.Error())
 	}
@@ -83,11 +83,11 @@ func (self *RelationShipCenter) UpdateRelationShip(relation *user.UserRelationSh
 	return user.UserRelationShipToString(newRelation)
 }
 
-func (self *RelationShipCenter) waitingForDataWriteFinished() bool {
-	self.needFlushRelationData = true
+func (rls *RelationShipCenter) waitingForDataWriteFinished() bool {
+	rls.needFlushRelationData = true
 	for {
-		if len(self.relationsToDb) == 0 {
-			self.postgresDb.Close()
+		if len(rls.relationsToDb) == 0 {
+			rls.postgresDb.Close()
 			return true
 		}
 		time.Sleep(100 * time.Millisecond)
@@ -95,16 +95,16 @@ func (self *RelationShipCenter) waitingForDataWriteFinished() bool {
 	return true
 }
 
-func (self *RelationShipCenter) writeUserRelationsToDb() {
+func (rls *RelationShipCenter) writeUserRelationsToDb() {
 	cnt := 0
 	relations := []*user.UserRelationShip{}
 	for {
-		relation := <-self.relationsToDb
+		relation := <-rls.relationsToDb
 		relations = append(relations, relation)
 		cnt++
-		if (self.needFlushRelationData && len(self.relationsToDb) == 0) ||
+		if (rls.needFlushRelationData && len(rls.relationsToDb) == 0) ||
 			cnt == DEFAULT_BATCH_WRITE_NUM {
-			err := self.postgresDb.UpdateUserRelations(relations)
+			err := rls.postgresDb.UpdateUserRelations(relations)
 			if err != nil {
 				log.FFatal("write db get error:%s", err.Error())
 			}

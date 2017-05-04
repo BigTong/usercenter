@@ -61,42 +61,42 @@ type UserDataCenter struct {
 	needFlushUserData bool
 }
 
-func (self *UserDataCenter) CheckNameRepeadedAndUpdateNameSet(userName string) bool {
+func (udc *UserDataCenter) CheckNameRepeadedAndUpdateNameSet(userName string) bool {
 	if len(userName) == 0 {
 		return false
 	}
 
-	self.userNameMutex.Lock()
-	defer self.userNameMutex.Unlock()
-	if _, ok := self.userNameSet[userName]; ok {
+	udc.userNameMutex.Lock()
+	defer udc.userNameMutex.Unlock()
+	if _, ok := udc.userNameSet[userName]; ok {
 		return false
 	}
 
-	self.userNameSet[userName] = struct{}{}
+	udc.userNameSet[userName] = struct{}{}
 	return true
 
 }
 
-func (self *UserDataCenter) AddUser(user *user.User) ([]byte, error) {
-	self.userListRWLock.Lock()
-	self.userList = append(self.userList, user)
-	self.userListRWLock.Unlock()
+func (udc *UserDataCenter) AddUser(user *user.User) ([]byte, error) {
+	udc.userListRWLock.Lock()
+	udc.userList = append(udc.userList, user)
+	udc.userListRWLock.Unlock()
 
-	self.updateUserChan <- user
+	udc.updateUserChan <- user
 	return json.Marshal(user)
 }
 
-func (self *UserDataCenter) UserList() ([]byte, error) {
-	self.userListRWLock.RLock()
-	defer self.userListRWLock.RUnlock()
-	return json.Marshal(self.userList)
+func (udc *UserDataCenter) UserList() ([]byte, error) {
+	udc.userListRWLock.RLock()
+	defer udc.userListRWLock.RUnlock()
+	return json.Marshal(udc.userList)
 }
 
-func (self *UserDataCenter) WaitingForDataWriteFinished() bool {
-	self.needFlushUserData = true
+func (udc *UserDataCenter) WaitingForDataWriteFinished() bool {
+	udc.needFlushUserData = true
 	for {
-		if len(self.updateUserChan) == 0 {
-			self.postgresDb.Close()
+		if len(udc.updateUserChan) == 0 {
+			udc.postgresDb.Close()
 			return true
 		}
 		time.Sleep(100 * time.Millisecond)
@@ -104,30 +104,30 @@ func (self *UserDataCenter) WaitingForDataWriteFinished() bool {
 	return true
 }
 
-func (self *UserDataCenter) loadUserListFromDb() {
+func (udc *UserDataCenter) loadUserListFromDb() {
 	var err error
-	self.userList, err = self.postgresDb.LoadUserList()
+	udc.userList, err = udc.postgresDb.LoadUserList()
 	if err != nil {
 		log.FFatal("load user list get error: %s", err.Error())
 	}
 
-	for _, u := range self.userList {
-		self.userNameSet[u.Name] = struct{}{}
+	for _, u := range udc.userList {
+		udc.userNameSet[u.Name] = struct{}{}
 	}
 
 }
 
-func (self *UserDataCenter) WriteNewUserDataToDb() {
+func (udc *UserDataCenter) WriteNewUserDataToDb() {
 	cnt := 0
 	users := []*user.User{}
 	for {
-		user := <-self.updateUserChan
+		user := <-udc.updateUserChan
 		users = append(users, user)
 		cnt++
-		if (self.needFlushUserData && len(self.updateUserChan) == 0) ||
+		if (udc.needFlushUserData && len(udc.updateUserChan) == 0) ||
 			cnt == DEFAULT_BATCH_WRITE_NUM {
 			log.FInfo("get user:%v len:%d", *users[0], len(users))
-			err := self.postgresDb.AddUser(users)
+			err := udc.postgresDb.AddUser(users)
 			if err != nil {
 				log.FFatal("write db get error:%s", err.Error())
 			}
